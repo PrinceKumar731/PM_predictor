@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import joblib
 import pandas as pd
 
@@ -28,7 +30,12 @@ def main() -> None:
     else:
         model = build_model("xgboost")
 
-    model.fit(X_train, y_train, verbose=False)
+    model.fit(
+        X_train,
+        y_train,
+        eval_set=[(X_train, y_train), (X_val, y_val)],
+        verbose=False,
+    )
 
     val_pred = model.predict(X_val)
     test_pred = model.predict(X_test)
@@ -45,6 +52,8 @@ def main() -> None:
         },
         MODELS_DIR / "metrics.joblib",
     )
+    with open(MODELS_DIR / "training_history.json", "w", encoding="utf-8") as file:
+        json.dump(model.evals_result(), file, indent=2)
 
     importance = pd.DataFrame(
         {

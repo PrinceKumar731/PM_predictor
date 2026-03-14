@@ -25,6 +25,24 @@ def next_month(timestamp: pd.Timestamp) -> pd.Timestamp:
     return timestamp + pd.offsets.MonthBegin(1)
 
 
+def blend_future_prediction(
+    model_prediction: float,
+    location_history: pd.DataFrame,
+    forecast_time: pd.Timestamp,
+    horizon_steps: int,
+) -> float:
+    month_history = location_history[location_history["time"].dt.month == forecast_time.month]["pm25"]
+    seasonal_level = float(month_history.mean()) if not month_history.empty else float(location_history["pm25"].mean())
+    recent_level = float(location_history["pm25"].tail(6).mean())
+
+    model_weight = max(0.55, 0.85 - 0.03 * max(horizon_steps - 1, 0))
+    seasonal_weight = min(0.30, 0.10 + 0.02 * max(horizon_steps - 1, 0))
+    recent_weight = 1.0 - model_weight - seasonal_weight
+
+    blended = (model_weight * model_prediction) + (seasonal_weight * seasonal_level) + (recent_weight * recent_level)
+    return float(blended)
+
+
 def add_month_features(frame: pd.DataFrame, first_time: pd.Timestamp) -> pd.DataFrame:
     data = frame.copy()
     data["year"] = data["time"].dt.year
@@ -183,15 +201,37 @@ def main() -> None:
     model = joblib.load(MODELS_DIR / "pm25_xgboost.joblib")
     feature_list = joblib.load(MODELS_DIR / "feature_columns.joblib")
 
+    observed_history = history.copy()
     forecast_time = next_month(last_available)
+    horizon_steps = 1
     while forecast_time <= target_time:
         future_rows = build_future_month_rows(history, forecast_time, feature_list)
-        future_rows["pm25"] = model.predict(future_rows[feature_list])
+        raw_predictions = model.predict(future_rows[feature_list])
+        blended_predictions = []
+        for idx, prediction in enumerate(raw_predictions):
+            row = future_rows.iloc[idx]
+            location_history = observed_history[
+                (observed_history["latitude"] == row["latitude"]) & (observed_history["longitude"] == row["longitude"])
+            ].copy()
+            if location_history.empty:
+                location_history = history[
+                    (history["latitude"] == row["latitude"]) & (history["longitude"] == row["longitude"])
+                ].copy()
+            blended_predictions.append(
+                blend_future_prediction(
+                    model_prediction=float(prediction),
+                    location_history=location_history.sort_values("time"),
+                    forecast_time=forecast_time,
+                    horizon_steps=horizon_steps,
+                )
+            )
+        future_rows["pm25"] = blended_predictions
         history_columns = ["time", "latitude", "longitude", "pm25"]
         if "satellite_pm25_aux" in future_rows.columns:
             history_columns.append("satellite_pm25_aux")
         history = pd.concat([history, future_rows[history_columns]], ignore_index=True)
         forecast_time = next_month(forecast_time)
+        horizon_steps += 1
 
     target_rows = history[history["time"] == target_time].copy()
     target_rows["distance_to_query"] = ((target_rows["latitude"] - args.lat) ** 2 + (target_rows["longitude"] - args.lon) ** 2) ** 0.5

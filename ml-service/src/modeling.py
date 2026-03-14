@@ -55,6 +55,7 @@ def build_model(model_name: str = "xgboost", random_state: int = 42):
 
     return XGBRegressor(
         objective="reg:squarederror",
+        eval_metric=["rmse", "mae"],
         n_estimators=350,
         max_depth=6,
         learning_rate=0.05,
@@ -91,6 +92,7 @@ def tune_xgboost_with_time_cv(X: pd.DataFrame, y: pd.Series) -> XGBRegressor:
 
             model = XGBRegressor(
                 objective="reg:squarederror",
+                eval_metric="rmse",
                 reg_alpha=0.1,
                 reg_lambda=1.0,
                 min_child_weight=3,
@@ -110,6 +112,7 @@ def tune_xgboost_with_time_cv(X: pd.DataFrame, y: pd.Series) -> XGBRegressor:
     assert best_params is not None
     return XGBRegressor(
         objective="reg:squarederror",
+        eval_metric=["rmse", "mae"],
         reg_alpha=0.1,
         reg_lambda=1.0,
         min_child_weight=3,
