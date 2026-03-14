@@ -8,6 +8,7 @@ import pandas as pd
 
 from .config import FEATURE_TABLE_NAME, MODELS_DIR, PROCESSED_DIR
 from .features import month_to_season
+from .data import load_meteorological_monthly_features
 
 
 def parse_args() -> argparse.Namespace:
@@ -120,6 +121,27 @@ def build_future_month_rows(history: pd.DataFrame, forecast_time: pd.Timestamp, 
             lambda row: float(np.mean(satellite_lag_values[(float(row["latitude"]), float(row["longitude"]))][-3:])),
             axis=1,
         )
+
+    met_feature_columns = [
+        "met_t2m_mean",
+        "met_d2m_mean",
+        "met_wind_speed_mean",
+        "met_msl_mean",
+        "met_sp_mean",
+        "met_tcc_mean",
+        "met_tp_sum",
+    ]
+    if any(column in feature_list for column in met_feature_columns):
+        met_frame = load_meteorological_monthly_features()
+        met_frame["time"] = pd.to_datetime(met_frame["time"]).dt.to_period("M").dt.to_timestamp()
+        met_row = met_frame[met_frame["time"] == forecast_time]
+        if met_row.empty:
+            climatology = met_frame.assign(month=met_frame["time"].dt.month).groupby("month", as_index=False).mean(numeric_only=True)
+            met_row = climatology[climatology["month"] == forecast_time.month]
+        if not met_row.empty:
+            for column in met_feature_columns:
+                if column in met_row.columns:
+                    future_rows[column] = float(met_row.iloc[0][column])
 
     previous_month = history["time"].max()
     previous_month_rows = history[history["time"] == previous_month].copy()

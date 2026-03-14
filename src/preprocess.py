@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from .config import FEATURE_TABLE_NAME, PROCESSED_DIR, RAW_TABLE_NAME, ensure_directories
-from .data import handle_missing_values, load_pm25_dataframe, load_satellite_feature_dataframe, merge_satellite_feature
+from .data import (
+    handle_missing_values,
+    load_meteorological_monthly_features,
+    load_pm25_dataframe,
+    load_satellite_feature_dataframe,
+    merge_meteorological_features,
+    merge_satellite_feature,
+)
 from .features import build_features
 
 
@@ -13,6 +20,11 @@ def main() -> None:
     try:
         satellite_df = load_satellite_feature_dataframe()
         clean_df = merge_satellite_feature(clean_df, satellite_df)
+    except FileNotFoundError:
+        pass
+    try:
+        met_df = load_meteorological_monthly_features()
+        clean_df = merge_meteorological_features(clean_df, met_df)
     except FileNotFoundError:
         pass
     feature_df, feature_description = build_features(clean_df)

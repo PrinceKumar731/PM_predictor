@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .config import LAT_MAX, LAT_MIN, LON_MAX, LON_MIN, PM_RAW_DIR, SATELLITE_RAW_DIR
+from .config import LAT_MAX, LAT_MIN, LON_MAX, LON_MIN, METEOROLOGICAL_DIR, PM_RAW_DIR, SATELLITE_RAW_DIR
 
 
 def find_netcdf_files(raw_dir: Path = PM_RAW_DIR) -> list[Path]:
@@ -189,5 +189,77 @@ def merge_satellite_feature(pm_frame: pd.DataFrame, satellite_frame: pd.DataFram
             .apply(lambda series: series.interpolate(method="linear", limit_direction="both"))
         )
         merged["satellite_pm25_aux"] = merged["satellite_pm25_aux"].fillna(merged["pm25"])
+
+    return merged
+
+
+def load_meteorological_monthly_features(raw_dir: Path = METEOROLOGICAL_DIR) -> pd.DataFrame:
+    instant_path = raw_dir / "data_stream-oper_stepType-instant.nc"
+    accum_path = raw_dir / "data_stream-oper_stepType-accum.nc"
+    if not instant_path.exists() or not accum_path.exists():
+        raise FileNotFoundError("Meteorological NetCDF files not found.")
+
+    with xr.open_dataset(instant_path) as instant_ds, xr.open_dataset(accum_path) as accum_ds:
+        lat_name = _detect_coordinate_name(instant_ds, ["lat", "latitude", "Latitude", "LAT"])
+        lon_name = _detect_coordinate_name(instant_ds, ["lon", "longitude", "Longitude", "LON"])
+        time_name = _detect_coordinate_name(instant_ds, ["valid_time", "time", "month"])
+
+        instant_subset = instant_ds.sel(
+            {
+                lat_name: slice(LAT_MAX, LAT_MIN) if instant_ds[lat_name].values[0] > instant_ds[lat_name].values[-1] else slice(LAT_MIN, LAT_MAX),
+                lon_name: slice(LON_MIN, LON_MAX) if instant_ds[lon_name].values[0] < instant_ds[lon_name].values[-1] else slice(LON_MAX, LON_MIN),
+            }
+        )
+        accum_subset = accum_ds.sel(
+            {
+                lat_name: slice(LAT_MAX, LAT_MIN) if accum_ds[lat_name].values[0] > accum_ds[lat_name].values[-1] else slice(LAT_MIN, LAT_MAX),
+                lon_name: slice(LON_MIN, LON_MAX) if accum_ds[lon_name].values[0] < accum_ds[lon_name].values[-1] else slice(LON_MAX, LON_MIN),
+            }
+        )
+
+        instant_frame = instant_subset[["u10", "v10", "d2m", "t2m", "msl", "sp", "tcc"]].to_dataframe().reset_index()
+        accum_frame = accum_subset[["tp"]].to_dataframe().reset_index()
+
+    instant_frame["time"] = pd.to_datetime(instant_frame[time_name]).dt.to_period("M").dt.to_timestamp()
+    accum_frame["time"] = pd.to_datetime(accum_frame[time_name]).dt.to_period("M").dt.to_timestamp()
+
+    instant_frame["wind_speed_10m"] = np.sqrt(instant_frame["u10"] ** 2 + instant_frame["v10"] ** 2)
+
+    monthly_instant = (
+        instant_frame.groupby("time", as_index=False)
+        .agg(
+            met_t2m_mean=("t2m", "mean"),
+            met_d2m_mean=("d2m", "mean"),
+            met_wind_speed_mean=("wind_speed_10m", "mean"),
+            met_msl_mean=("msl", "mean"),
+            met_sp_mean=("sp", "mean"),
+            met_tcc_mean=("tcc", "mean"),
+        )
+        .sort_values("time")
+        .reset_index(drop=True)
+    )
+
+    monthly_accum = (
+        accum_frame.groupby("time", as_index=False)
+        .agg(met_tp_sum=("tp", "sum"))
+        .sort_values("time")
+        .reset_index(drop=True)
+    )
+
+    return monthly_instant.merge(monthly_accum, on="time", how="outer").sort_values("time").reset_index(drop=True)
+
+
+def merge_meteorological_features(pm_frame: pd.DataFrame, met_frame: pd.DataFrame) -> pd.DataFrame:
+    data = pm_frame.copy()
+    data["time"] = pd.to_datetime(data["time"]).dt.to_period("M").dt.to_timestamp()
+    met = met_frame.copy()
+    met["time"] = pd.to_datetime(met["time"]).dt.to_period("M").dt.to_timestamp()
+
+    merged = data.merge(met, on="time", how="left")
+
+    met_columns = [column for column in met.columns if column != "time"]
+    for column in met_columns:
+        merged[column] = merged[column].interpolate(limit_direction="both")
+        merged[column] = merged[column].fillna(merged[column].median())
 
     return merged

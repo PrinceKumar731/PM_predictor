@@ -97,6 +97,20 @@ def build_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         data["satellite_pm25_aux_lag_1"] = data["satellite_pm25_aux_lag_1"].fillna(data["satellite_pm25_aux"])
         data["satellite_pm25_aux_lag_3"] = data["satellite_pm25_aux_lag_3"].fillna(data["satellite_pm25_aux"])
 
+    met_columns = [
+        "met_t2m_mean",
+        "met_d2m_mean",
+        "met_wind_speed_mean",
+        "met_msl_mean",
+        "met_sp_mean",
+        "met_tcc_mean",
+        "met_tp_sum",
+    ]
+    for column in met_columns:
+        if column in data.columns:
+            data[column] = data[column].interpolate(limit_direction="both")
+            data[column] = data[column].fillna(data[column].median())
+
     data["season"] = data["season"].astype("category")
     model_data = pd.get_dummies(data, columns=["season"], drop_first=False)
 
@@ -130,6 +144,22 @@ def build_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
             ]
         )
         description = pd.concat([description, satellite_description], ignore_index=True)
+
+    present_met_columns = [column for column in met_columns if column in model_data.columns]
+    if present_met_columns:
+        met_description = pd.DataFrame(
+            [
+                {"feature": "met_t2m_mean", "reason": "Monthly mean 2m temperature over Pune from the meteorological grid."},
+                {"feature": "met_d2m_mean", "reason": "Monthly mean 2m dewpoint over Pune, capturing moisture conditions."},
+                {"feature": "met_wind_speed_mean", "reason": "Monthly mean 10m wind speed over Pune, capturing dispersion strength."},
+                {"feature": "met_msl_mean", "reason": "Monthly mean sea-level pressure, reflecting large-scale atmospheric conditions."},
+                {"feature": "met_sp_mean", "reason": "Monthly mean surface pressure over Pune."},
+                {"feature": "met_tcc_mean", "reason": "Monthly mean total cloud cover over Pune."},
+                {"feature": "met_tp_sum", "reason": "Monthly total precipitation over Pune, capturing washout effects."},
+            ]
+        )
+        met_description = met_description[met_description["feature"].isin(present_met_columns)]
+        description = pd.concat([description, met_description], ignore_index=True)
 
     return model_data, description
 

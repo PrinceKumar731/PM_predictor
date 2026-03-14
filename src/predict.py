@@ -66,6 +66,16 @@ def main() -> None:
             f"SHAP={item['shap_value']:.3f} ({direction} prediction)"
         )
 
+    met_explanation = explanation[explanation["feature"].str.startswith("met_")].copy()
+    if not met_explanation.empty:
+        print("Meteorological factors affecting the prediction:")
+        for _, item in met_explanation.sort_values("abs_shap", ascending=False).iterrows():
+            direction = "increased" if item["shap_value"] >= 0 else "decreased"
+            print(
+                f"- {item['feature']}: value={item['feature_value']:.6g}, "
+                f"SHAP={item['shap_value']:.3f} ({direction} prediction)"
+            )
+
 
 if __name__ == "__main__":
     main()
