@@ -2,12 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import * as dotenv from 'dotenv';
+import multer from 'multer';
+import { exec } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8000;
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
+
+const upload = multer({ dest: 'uploads/' });
 
 if (!OPENWEATHER_API_KEY) {
   console.error('CRITICAL ERROR: OPENWEATHER_API_KEY is not set in .env file');
@@ -16,6 +24,42 @@ if (!OPENWEATHER_API_KEY) {
 
 app.use(cors());
 app.use(express.json());
+
+// Create uploads folder if not exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
+
+app.post('/api/bulk-predict', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const inputPath = req.file.path;
+  const outputPath = path.join('uploads', `output_${req.file.filename}.csv`);
+  
+  const pythonPath = path.join(__dirname, '../ml-service/.venv/bin/python');
+  const scriptPath = path.join(__dirname, '../ml-service/src/bulk_predict.py');
+  
+  const command = `${pythonPath} ${scriptPath} --input ${inputPath} --output ${outputPath}`;
+
+  console.log(`Executing bulk prediction: ${command}`);
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Exec Error: ${error.message}`);
+      return res.status(500).json({ error: 'Failed to process CSV', detail: stderr });
+    }
+
+    res.download(outputPath, 'air_quality_predictions.csv', (err) => {
+      // Clean up files after download
+      fs.unlinkSync(inputPath);
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+    });
+  });
+});
 
 app.post('/api/predict', async (req, res) => {
   const { latitude, longitude, year, month } = req.body;
