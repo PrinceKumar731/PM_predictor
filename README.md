@@ -24,7 +24,7 @@ PM_predictor/
 ├── backend/                  # Analytical Infrastructure (Node.js)
 │   ├── index.js              # Express API and Python execution bridge
 │   ├── package.json          # Backend dependencies
-│   └── .env                  # Environment configuration
+│   └── .env                  # Environment config
 ├── frontend/                 # Visualization Dashboard (React + TS)
 │   ├── src/                  # UI components and state logic
 │   │   ├── App.tsx           # Main dashboard orchestration
