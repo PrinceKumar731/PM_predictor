@@ -2,7 +2,11 @@
 
 A high-resolution environmental monitoring and predictive dashboard powered by a proprietary machine learning pipeline. This system provides granular PM2.5 forecasting across the Asian continent, utilizing sophisticated spatial-temporal modeling and multi-source data integration.
 
-## Monorepo File Structure
+## Demo video
+
+https://github.com/user-attachments/assets/dcee66a4-435f-43c9-9a3f-50b582cd4307
+
+## Project File Structure
 
 ```text
 PM_predictor/
@@ -28,6 +32,8 @@ PM_predictor/
 │   └── package.json          # Frontend dependencies
 └── README.md                 # Project documentation
 ```
+### Stats For Nerds 
+https://www.figma.com/make/rnWFCW62VYmGyRpMZFlSfy/Stats-for-nerds?p=f
 
 ## Model Architecture and Methodology
 
@@ -49,6 +55,9 @@ The model utilizes a multi-dimensional feature vector:
 - **SHAP Integration:** The system employs the Shapley Additive exPlanations framework to decompose individual predictions.
 - **Feature Contribution:** Local explanations quantify the exact µg/m³ contribution of each factor (e.g., how much the current monsoon season is suppressing PM2.5 levels).
 - **Global Importance:** Aggregated importance graphs provide a macro-level view of which environmental drivers dominate regional air quality.
+
+<img width="900" height="900" alt="image" src="https://github.com/user-attachments/assets/a0992634-99e0-46f3-b5ec-698cf510e9a7" />
+
 
 ## System Architecture
 
