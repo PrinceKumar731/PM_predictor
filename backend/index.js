@@ -18,8 +18,7 @@ const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY;
 const upload = multer({ dest: 'uploads/' });
 
 if (!OPENWEATHER_API_KEY) {
-  console.error('CRITICAL ERROR: OPENWEATHER_API_KEY is not set in .env file');
-  process.exit(1);
+  console.warn('WARNING: OPENWEATHER_API_KEY is not set. City search and predictions will not work.');
 }
 
 app.use(cors());
@@ -62,8 +61,11 @@ app.post('/api/bulk-predict', upload.single('file'), (req, res) => {
 });
 
 app.post('/api/predict', async (req, res) => {
+  if (!OPENWEATHER_API_KEY) {
+    return res.status(503).json({ error: 'Server not configured: OPENWEATHER_API_KEY missing in .env' });
+  }
   const { latitude, longitude, year, month } = req.body;
-  
+
   try {
     // Fetch Air Pollution data from OpenWeather
     // Note: Free tier primarily supports current data. 
@@ -110,6 +112,9 @@ app.post('/api/predict', async (req, res) => {
 
 // Endpoint to search for Asian cities
 app.get('/api/search-cities', async (req, res) => {
+  if (!OPENWEATHER_API_KEY) {
+    return res.status(503).json({ error: 'Server not configured: OPENWEATHER_API_KEY missing in .env' });
+  }
   const query = req.query.q;
   if (!query || query.length < 2) {
     return res.json([]);

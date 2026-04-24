@@ -70,8 +70,10 @@ ml-service/outputs/**
 *.svg
 *.pdf
 
-# Frontend dependencies / build
+# Node dependencies / build
+node_modules/
 frontend/node_modules/
+backend/node_modules/
 frontend/dist/
 frontend/build/
 

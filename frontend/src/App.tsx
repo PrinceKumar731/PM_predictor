@@ -119,7 +119,7 @@ function App() {
     const formData = new FormData();
     formData.append('file', csvFile);
     try {
-      const resp = await fetch('http://localhost:8000/api/bulk-predict', { method: 'POST', body: formData });
+      const resp = await fetch('/api/bulk-predict', { method: 'POST', body: formData });
       if (!resp.ok) throw new Error('Failed to process CSV');
       const blob = await resp.blob();
       const url = window.URL.createObjectURL(blob);
@@ -131,8 +131,13 @@ function App() {
 
   const loadOptions = async (q: string) => {
     if (!q || q.length < 2) return [];
-    const resp = await fetch(`http://localhost:8000/api/search-cities?q=${q}`);
-    return await resp.json();
+    try {
+      const resp = await fetch(`/api/search-cities?q=${encodeURIComponent(q)}`);
+      if (!resp.ok) return [];
+      return await resp.json();
+    } catch {
+      return [];
+    }
   };
 
   const handleCityChange = (opt: any) => {
@@ -144,7 +149,7 @@ function App() {
     e.preventDefault(); setLoading(true); setError(null); setResult(null);
     generateImportanceData();
     try {
-      const resp = await fetch('http://localhost:8000/api/predict', {
+      const resp = await fetch('/api/predict', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ latitude: parseFloat(lat), longitude: parseFloat(lon), year: parseInt(year), month: parseInt(month) })
       });
@@ -284,6 +289,7 @@ function App() {
               {useCity ? <AsyncSelect loadOptions={loadOptions} onChange={handleCityChange} value={selectedCityOption} placeholder="Search City..." classNamePrefix="react-select" styles={{ control: (b) => ({ ...b, background: 'var(--card-bg)', borderColor: 'var(--border-color)' }), singleValue: (b) => ({ ...b, color: 'var(--text-main)' }), menu: (b) => ({ ...b, background: 'var(--card-bg)' }) }} /> : <div className="form-row"><input type="number" value={lat} onChange={e => setLat(e.target.value)} placeholder="Lat" /><input type="number" value={lon} onChange={e => setLon(e.target.value)} placeholder="Lon" /></div>}
               <div className="form-row"><input type="number" value={year} onChange={e => setYear(e.target.value)} /><select value={month} onChange={e => setMonth(e.target.value)}>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>)}</select></div>
               <button type="submit" disabled={loading} className="predict-btn">{loading ? 'Analyzing...' : 'Predict'}</button>
+              {error && <div className="error-msg">{error}</div>}
             </form>
           </section>
           <section className="aqi-guide card">
