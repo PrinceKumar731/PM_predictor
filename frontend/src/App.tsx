@@ -246,7 +246,7 @@ function App() {
       {view === 'heatmap' ? (
         <div className="heatmap-view card">
           <div className="leaflet-wrapper">
-            <MapContainer center={[25.0, 95.0]} zoom={4} className="india-leaflet-map">
+            <MapContainer center={[25.0, 95.0] as [number, number]} zoom={4} className="india-leaflet-map">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {mapMode === 'markers' ? heatmapData.filter(p => !isCriticalOnly || p.pm > 90).map(p => (
                 <Circle key={p.id} center={[p.lat, p.lng]} pathOptions={{ fillColor: getPMColor(p.pm), color: getPMColor(p.pm), fillOpacity: 0.6 }} radius={50000}>
